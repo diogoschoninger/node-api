@@ -5,7 +5,13 @@ require('dotenv').config();
 const express = require('express');
 const app = express();
 const port = 3000;
+
+// Importing mysql2
 const mysql = require('mysql2');
+
+// Importing Json Web Token
+const jwt = require('jsonwebtoken');
+const SECRET = 'username';
 
 app.use(express.json());
 
@@ -14,7 +20,36 @@ app.get('/', (req, res) => {
   res.json({message: 'Running!'});
 });
 
-app.get('/customers/:id?', (req, res) => {
+app.post('/login', (req, res) => {
+  if (req.body.user === 'user' && req.body.password === '123') {
+    const token = jwt.sign({userId: 1}, SECRET, {expiresIn: 300});
+    return res.json({auth: true, token})
+  }
+  res.status(401).end();
+});
+
+function verifyJWT (req, res, next) {
+  const token = req.headers['x-access-token'];
+  if (blacklist.findIndex(item => item === token) !== -1) return res.status(401).end();
+
+  jwt.verify(token, SECRET, (err, decoded) => {
+    if (err) return res.status(401).end();
+
+    req.userId = decoded.userId;
+
+    next();
+  });
+}
+
+const blacklist = [];
+app.post('/logout', (req, res) => {
+  blacklist.push(req.headers['x-access-token']);
+  res.end();
+});
+
+app.get('/customers/:id?', verifyJWT, (req, res) => {
+  console.log(`User ${req.userId} called this route`);
+
   let sql;
   if (req.params.id) {
     sql = 'SELECT * FROM customers WHERE ID=?';
